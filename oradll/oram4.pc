@@ -1,0 +1,253 @@
+#include"../ora2016/stdafx.h"
+#include"../ora2016/myconst.h"
+#include"oram4.h"
+
+
+
+#pragma comment(lib,".\\orasql11.lib")
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+EXEC SQL BEGIN DECLARE SECTION;
+char uname[20],pwd[20],dbname[60],conn[1024];
+EXEC SQL END DECLARE SECTION;
+_declspec(dllexport) int WINAPI out_result(void *v)
+{
+	AFX_MANAGE_STATE(AfxGetStaticModuleState());
+
+	int i,j,k;
+	CString str;
+	CFile file;
+	if(init_data(v))
+		return -1;
+	EXEC SQL CONNECT :uname IDENTIFIED BY :pwd USING :dbname;
+	if(sqlca.sqlcode<0)
+	{
+		str.Format(_T("errno: %ld %s"),sqlca.sqlcode,(CString)(sqlca.sqlerrm.sqlerrmc));
+		MessageBox(NULL,str,"ora02.dll",0);
+		return -1;
+	}
+	if(alloc_da())
+	{
+		str.Format(_T("errno: %s"),"alloc error");
+		MessageBox(NULL,str,"oram4.dll",0);
+		return -1;
+	}
+	EXEC SQL PREPARE sqlconn FROM :conn;
+	if(sqlca.sqlcode<0)
+	{
+		str.Format(_T("errno: %ld %s"),sqlca.sqlcode,(CString)(sqlca.sqlerrm.sqlerrmc));
+		MessageBox(NULL,str,_T("prepare error"),0);
+		return -1;
+	}
+	EXEC SQL DECLARE cur_sp CURSOR FOR sqlconn;
+	if(sqlca.sqlcode<0)
+	{
+		str.Format(_T("errno: %ld %s"),sqlca.sqlcode,(CString)(sqlca.sqlerrm.sqlerrmc));
+		MessageBox(NULL,str,_T("declare cursor error"),0);
+		return -1;
+	}
+	set_sql_b();
+	EXEC SQL OPEN cur_sp USING DESCRIPTOR bind_dp;
+	if(sqlca.sqlcode<0)
+	{
+		str.Format(_T("errno: %ld %s"),sqlca.sqlcode,(CString)(sqlca.sqlerrm.sqlerrmc));
+		MessageBox(NULL,str,_T("open cursor error"),0);
+		return -1;
+	}
+	set_sql_s();
+	if(!file.Open(fname,CFile::modeReadWrite|CFile::modeCreate))
+		sql_error("open file error");
+	while(1)
+	{
+		EXEC SQL WHENEVER NOT FOUND DO break;
+		EXEC SQL FETCH cur_sp USING DESCRIPTOR sel_dp;
+		if(sqlca.sqlcode<0)
+		{//-1405 允许空的列值
+			if(sqlca.sqlcode!=-1405)
+			{
+				str.Format(_T("errno: %ld %s"),sqlca.sqlcode,(CString)(sqlca.sqlerrm.sqlerrmc));
+				MessageBox(NULL,str,"ora02.dll",0);
+				break;	
+			}
+		}
+		memset((void*)&buf,0,sizeof(buf));
+		j=0;memset(buf,0,sizeof(buf));
+		for(i=0;i<sel_dp->F;i++)
+		{
+			k=(sel_dp->L[i]);
+			if((j+k) >= (BUF_SZ-1)) //for return
+				sql_error("record length is too long!");
+			memcpy((char*)&buf[j],(char *)(sel_dp->V[i]),k);
+			for(;k>1;k--)
+			{
+				if(buf[j+k-1]==0x20)
+					buf[j+k-1]=0;
+				else
+					break;
+			}
+			j+=k+1;
+			buf[j-1]='\t';
+		}
+		buf[j-1]=0xd;buf[j]=0xa;
+		file.Write(buf,j+1);
+	}
+	file.Close();
+	free_da();
+	EXEC SQL WHENEVER SQLERROR CONTINUE;
+	EXEC SQL CLOSE cur_sp;
+	EXEC SQL COMMIT WORK RELEASE;
+	return 0; //perfect!!
+};
+int init_data(void *vd)
+{
+	_tagbas *tb=(_tagbas*)vd;	
+	memset((void*)&uname,0,sizeof(uname));
+	memset((void*)&pwd,0,sizeof(pwd));
+	memset((void*)&dbname,0,sizeof(dbname));
+	memset((void*)&conn,0,sizeof(conn)); //like "select count(*) from user_tab_columns where table_name ="
+	memcpy((void*)&uname,tb->uname,strlen(tb->uname));
+	memcpy((void*)&pwd,tb->pwd,strlen(tb->pwd));
+	memcpy((void*)&dbname,tb->dbname,strlen(tb->dbname));
+	memcpy((void*)&conn,tb->conn,sizeof(tb->conn));
+	CTime tma=CTime::GetTickCount();
+	int i;
+	CString str,s1;
+	memset(fname,0,sizeof(fname));
+	::GetModuleFileNameA(NULL,fname,sizeof(fname));
+	s1.Format(fname);
+	i=s1.ReverseFind('\\');
+	str=s1.Left(i+1);
+	s1=tma.Format("oracle_to_mysql20%y%m%d%H%M%S.txt");
+	str+=s1;
+	memset(fname,0,sizeof(fname));
+	i=str.GetLength();
+	if(i>=FNAME_SZ)
+	{
+		MessageBox(NULL,"file path is too long!","from dll",0);
+		return 1;
+	}
+	memcpy(fname,str.GetBuffer(0),i);
+	return 0;
+};
+//SQLDA指针的内存分配函数
+int alloc_da()
+{
+	int i;
+	if((bind_dp=SQLSQLDAAlloc(SQL_SINGLE_RCTX,ITEM_LIMIT,VALUE_LIMIT,INDICATOR_LIMIT)) == (SQLDA *)0)
+		return 1;
+	bind_dp->N =ITEM_LIMIT;
+	if((sel_dp=SQLSQLDAAlloc(SQL_SINGLE_RCTX,ITEM_LIMIT,VALUE_LIMIT,INDICATOR_LIMIT)) == (SQLDA*)0)
+		return 1; //error
+	sel_dp->N = ITEM_LIMIT;
+	for(i=0;i<ITEM_LIMIT;i++)
+	{
+		bind_dp->I[i]	= (short *)malloc(sizeof(short));
+		bind_dp->V[i]	= (char *)malloc(sizeof(char));
+		sel_dp->I[i] = (short *)malloc(sizeof(short));
+		sel_dp->V[i] = (char *)malloc(1);
+	}
+	return 0;
+};
+//SQLDA指针的内存释放函数
+void free_da()
+{
+	int i;
+    for (i = 0; i < ITEM_LIMIT; i++)
+    {    
+        if (bind_dp->V[i] != (char *) 0)
+            free(bind_dp->V[i]);
+        free(bind_dp->I[i]);   /* ITEM_LIMIT were allocated. */
+        if (sel_dp->V[i] != (char *) 0)
+            free(sel_dp->V[i]);
+        free(sel_dp->I[i]); /* ITEM_LIMIT were allocated. */
+    }
+    /* Free space used by the descriptors themselves. */
+    SQLSQLDAFree( SQL_SINGLE_RCTX, bind_dp);
+    SQLSQLDAFree( SQL_SINGLE_RCTX, sel_dp);
+};
+//动态执行SQL的错误处理函数
+void sql_error(char *ch)
+{
+	printf("%s\n%s\n", ch,(char *)sqlca.sqlerrm.sqlerrmc);
+	free_da();
+	EXEC SQL ROLLBACK RELEASE;
+	exit(0);
+};
+//SQLDA结构指针bind_dp的赋值函数
+void set_sql_b()
+{
+	int i;
+	EXEC SQL WHENEVER SQLERROR DO sql_error("set_sql_b");
+	EXEC SQL DESCRIBE BIND VARIABLES FOR sqlconn INTO bind_dp;
+	if(bind_dp->F<0)
+		sql_error("columns is too long");
+	bind_dp->N = bind_dp->F;
+	for(i=0;i<bind_dp->N;i++)
+	{
+		bind_dp->T[i]=1;
+	}
+};
+//SQLDA结构指针sel_dp的赋值函数
+void set_sql_s()
+{
+	int i,null_ok,precision,scale;
+	EXEC SQL WHENEVER SQLERROR DO sql_error("set_sql_s");
+	EXEC SQL DESCRIBE SELECT LIST FOR sqlconn INTO sel_dp;
+	if(sel_dp->F<0)
+		sql_error("columnsaaaa is too long");
+	sel_dp->N = sel_dp->F;
+	for(i=0;i<sel_dp->F;i++)
+	{
+//		SQLColumnNullCheck((unsigned short *)&(sel_dp->T[i]), (unsigned short *)&(sel_dp->T[i]), &null_ok);
+		sqlnul((unsigned short *)&(sel_dp->T[i]), (unsigned short *)&(sel_dp->T[i]), &null_ok);	
+		switch(sel_dp->T[i])
+		{
+		case 1:	//char	type
+			break;
+		case 2: //number type
+		    sqlprc((unsigned int *)&(sel_dp->L[i]), &precision, &scale);
+			//SQLNumberPrecV6( SQL_SINGLE_RCTX,(unsigned long *)&(sel_dp->L[i]), &precision, &scale);
+		    if (precision == 0) 
+			 	precision = 40;
+   	        if (scale > 0)//转换数字类型为浮点型
+	           sel_dp->L[i] = sizeof(float);
+	        else//否则为整型
+	            sel_dp->L[i] = sizeof(int);
+	        break;
+	    case  8 : /* LONG datatype */
+	        sel_dp->L[i] = 240;
+	        break;
+	    case 11 : /* ROWID datatype */
+	        sel_dp->L[i] = 18;
+	      break;
+	   case 12 : /* DATE datatype */
+	       sel_dp->L[i] = 9;
+	       break;
+	   case 23 : /* RAW datatype */
+	       break;
+	   case 24 : /* LONG RAW datatype */
+	      sel_dp->L[i] = 240;
+	      break;
+		};
+		sel_dp->V[i] = (char *)realloc(sel_dp->V[i], sel_dp->L[i]+1);
+		sel_dp->V[i][sel_dp->L[i]] =0x20;//加上终止符
+		sel_dp->T[i] = 1;//把所有类型转换为字符型
+	}
+};
+
+
+
+
+
+
+
+
+
+
+

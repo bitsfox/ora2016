@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ora2016", "ora2016\ora2016.vcxproj", "{D04B14C0-BD24-4434-A4B3-64C0B69FA83D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "oradll", "oradll\oradll.vcxproj", "{E6621C0E-74B6-4120-9949-9465365F3E55}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "oram4", "oram4\oram4.vcxproj", "{210514B8-E211-46A1-A3E0-4166E69D9474}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D04B14C0-BD24-4434-A4B3-64C0B69FA83D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D04B14C0-BD24-4434-A4B3-64C0B69FA83D}.Debug|Win32.Build.0 = Debug|Win32
+		{D04B14C0-BD24-4434-A4B3-64C0B69FA83D}.Release|Win32.ActiveCfg = Release|Win32
+		{D04B14C0-BD24-4434-A4B3-64C0B69FA83D}.Release|Win32.Build.0 = Release|Win32
+		{E6621C0E-74B6-4120-9949-9465365F3E55}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E6621C0E-74B6-4120-9949-9465365F3E55}.Debug|Win32.Build.0 = Debug|Win32
+		{E6621C0E-74B6-4120-9949-9465365F3E55}.Release|Win32.ActiveCfg = Release|Win32
+		{E6621C0E-74B6-4120-9949-9465365F3E55}.Release|Win32.Build.0 = Release|Win32
+		{210514B8-E211-46A1-A3E0-4166E69D9474}.Debug|Win32.ActiveCfg = Debug|Win32
+		{210514B8-E211-46A1-A3E0-4166E69D9474}.Debug|Win32.Build.0 = Debug|Win32
+		{210514B8-E211-46A1-A3E0-4166E69D9474}.Release|Win32.ActiveCfg = Release|Win32
+		{210514B8-E211-46A1-A3E0-4166E69D9474}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
